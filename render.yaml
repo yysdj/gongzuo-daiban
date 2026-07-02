@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: gongzuo-daiban
+    env: python
+    region: singapore
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python reminder_server.py
+    envVars:
+      - key: FEISHU_APP_ID
+        sync: false
+      - key: FEISHU_APP_SECRET
+        sync: false
+      - key: SPREADSHEET_TOKEN
+        sync: false
+      - key: SHEET_ID
+        value: aa2707

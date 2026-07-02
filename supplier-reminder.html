@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>今日工作待办</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #f0f2f5;
+  color: #333;
+  min-height: 100vh;
+}
+
+.header {
+  background: linear-gradient(135deg, #1a73e8, #1557b0);
+  color: #fff;
+  padding: 20px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.header h1 { font-size: 22px; font-weight: 600; }
+.header .today { font-size: 14px; opacity: 0.9; }
+
+.container { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+
+/* Server Config */
+.server-config {
+  background: #fffbe6;
+  border: 1px solid #ffe58f;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.server-config input {
+  flex: 1;
+  min-width: 200px;
+  padding: 6px 10px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.server-config button {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid #d9d9d9;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+}
+.server-config button:hover { background: #f0f0f0; }
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.status-dot.connected { background: #52c41a; }
+.status-dot.disconnected { background: #ff4d4f; }
+
+/* Alarm Banner */
+.alarm-banner {
+  display: none;
+  background: #ff4d4f;
+  color: #fff;
+  padding: 14px 24px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  animation: pulse 1.5s infinite;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+.alarm-banner.show { display: block; }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,77,79,0.5); }
+  50% { box-shadow: 0 0 0 12px rgba(255,77,79,0); }
+}
+
+/* Stats */
+.stats { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+.stat-card {
+  flex: 1; min-width: 130px; background: #fff; border-radius: 10px;
+  padding: 16px 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  display: flex; align-items: center; gap: 14px;
+}
+.stat-card .icon { font-size: 28px; }
+.stat-card .val { font-size: 26px; font-weight: 700; }
+.stat-card .label { font-size: 13px; color: #888; }
+.stat-card.today .val { color: #fa8c16; }
+.stat-card.overdue .val { color: #ff4d4f; }
+.stat-card.total .val { color: #1a73e8; }
+.stat-card.done .val { color: #52c41a; }
+
+/* Card */
+.card {
+  background: #fff; border-radius: 12px; padding: 24px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.06); margin-bottom: 20px;
+}
+.card h2 { font-size: 17px; margin-bottom: 18px; color: #222; }
+
+.form-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+}
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group label { font-size: 13px; font-weight: 600; color: #555; }
+.form-group input, .form-group select {
+  padding: 10px 12px; border: 1.5px solid #d9d9d9; border-radius: 8px;
+  font-size: 14px; transition: border-color 0.2s; outline: none;
+}
+.form-group input:focus, .form-group select:focus {
+  border-color: #1a73e8; box-shadow: 0 0 0 3px rgba(26,115,232,0.1);
+}
+.btn-row { display: flex; gap: 10px; margin-top: 18px; align-items: flex-end; flex-wrap: wrap; }
+
+.btn {
+  padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 600;
+  cursor: pointer; border: none; transition: all 0.2s;
+}
+.btn-primary { background: #1a73e8; color: #fff; }
+.btn-primary:hover { background: #1557b0; }
+.btn-danger { background: #ff4d4f; color: #fff; }
+.btn-danger:hover { background: #d9363e; }
+.btn-success { background: #52c41a; color: #fff; }
+.btn-success:hover { background: #389e0d; }
+.btn-outline { background: #fff; color: #555; border: 1.5px solid #d9d9d9; }
+.btn-outline:hover { border-color: #1a73e8; color: #1a73e8; }
+.btn-ghost { background: transparent; color: #1a73e8; padding: 6px 12px; }
+.btn-ghost:hover { background: rgba(26,115,232,0.06); }
+
+/* Filter */
+.filter-row {
+  display: flex; gap: 12px; margin-bottom: 16px; align-items: center; flex-wrap: wrap;
+}
+.filter-tabs { display: flex; gap: 6px; }
+.filter-tab {
+  padding: 7px 18px; border-radius: 20px; font-size: 13px; font-weight: 600;
+  cursor: pointer; border: 1.5px solid #d9d9d9; background: #fff; color: #666;
+  transition: all 0.2s;
+}
+.filter-tab:hover { border-color: #1a73e8; color: #1a73e8; }
+.filter-tab.active { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+
+.filter-select {
+  padding: 7px 12px; border-radius: 8px; border: 1.5px solid #d9d9d9;
+  font-size: 13px; outline: none; background: #fff; cursor: pointer;
+}
+.filter-select:focus { border-color: #1a73e8; }
+
+.filter-spacer { flex: 1; }
+
+.search-bar { flex: 1; min-width: 200px; max-width: 340px; }
+.search-bar input {
+  width: 100%; padding: 8px 14px; border: 1.5px solid #d9d9d9;
+  border-radius: 8px; font-size: 14px; outline: none;
+}
+.search-bar input:focus { border-color: #1a73e8; }
+
+/* Table */
+.table-wrapper { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th {
+  background: #fafafa; padding: 10px 12px; text-align: left;
+  font-weight: 600; color: #666; border-bottom: 2px solid #e8e8e8;
+  white-space: nowrap; font-size: 13px;
+}
+td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+tr:hover td { background: #fafcff; }
+tr.row-overdue td { background: #fff2f0; }
+tr.row-overdue:hover td { background: #ffece8; }
+tr.row-today td { background: #fffbe6; }
+tr.row-today:hover td { background: #fff7cc; }
+tr.row-done td { background: #f5f5f5; color: #aaa; text-decoration: line-through; }
+tr.row-done:hover td { background: #eee; }
+
+.badge {
+  display: inline-block; padding: 3px 10px; border-radius: 10px;
+  font-size: 12px; font-weight: 600;
+}
+.badge-overdue { background: #fff2f0; color: #ff4d4f; }
+.badge-today { background: #fffbe6; color: #fa8c16; }
+.badge-upcoming { background: #f6ffed; color: #52c41a; }
+.badge-done { background: #f5f5f5; color: #aaa; }
+
+.empty-state {
+  text-align: center; padding: 48px 20px; color: #aaa;
+}
+
+/* Alarm Popup */
+.alarm-popup {
+  display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.55); z-index: 2000; justify-content: center; align-items: center;
+}
+.alarm-popup.show { display: flex; }
+.alarm-popup-inner {
+  background: #fff; border-radius: 16px; padding: 36px 32px; width: 90%; max-width: 460px;
+  text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+  animation: alarmBounce 0.5s infinite alternate;
+}
+@keyframes alarmBounce {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.03); }
+}
+.alarm-popup-inner .alarm-icon { font-size: 56px; margin-bottom: 12px; }
+.alarm-popup-inner h3 { font-size: 20px; color: #ff4d4f; margin-bottom: 8px; }
+.alarm-popup-inner .btn-dismiss {
+  margin-top: 20px; padding: 14px 48px; background: #ff4d4f; color: #fff;
+  border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer;
+}
+
+/* Toast */
+.toast {
+  position: fixed; top: 20px; right: 20px; z-index: 9999;
+  background: #fff; padding: 14px 20px; border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15); font-size: 14px;
+  max-width: 380px; animation: slideIn 0.3s ease;
+  display: flex; align-items: center; gap: 10px;
+  border-left: 4px solid #ff4d4f;
+}
+.toast.success { border-left-color: #52c41a; }
+.toast.info { border-left-color: #1a73e8; }
+
+/* Modal */
+.modal-overlay {
+  display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: #fff; border-radius: 14px; padding: 28px; width: 90%; max-width: 580px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+}
+
+.checkbox-cell { text-align: center; }
+.checkbox-cell input[type="checkbox"] {
+  width: 18px; height: 18px; cursor: pointer; accent-color: #52c41a;
+}
+
+@media (max-width: 600px) {
+  .header { padding: 16px 20px; }
+  .header h1 { font-size: 18px; }
+  .form-grid { grid-template-columns: 1fr; }
+  .stats { gap: 10px; }
+  .stat-card { min-width: 100px; padding: 12px 14px; }
+  .stat-card .val { font-size: 20px; }
+  .filter-row { flex-direction: column; align-items: stretch; }
+  .search-bar { max-width: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🔔 今日工作待办</h1>
+  <span class="today" id="headerDate"></span>
+</div>
+
+<div class="container">
+
+  <!-- Server Config -->
+  <div class="server-config" id="serverConfig">
+    <span>🌐 后端地址：</span>
+    <input type="text" id="serverUrl" placeholder="https://your-app.vercel.app 或 http://localhost:5199">
+    <button onclick="saveServerUrl()">🔌 连接</button>
+    <span>
+      <span class="status-dot disconnected" id="connDot"></span>
+      <span id="connText" style="color:#8c8c8c;">未连接</span>
+    </span>
+    <span style="color:#8c8c8c; font-size:11px;">填写后端地址并点击"连接"</span>
+  </div>
+
+  <!-- Alarm Banner -->
+  <div class="alarm-banner" id="alarmBanner" onclick="dismissAlarm()">
+    🚨 今天有 <span id="alarmCount">0</span> 条提醒需要催货，还有 <span id="overdueCount">0</span> 条已逾期，点击查看！
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card total">
+      <span class="icon">📋</span>
+      <div><div class="val" id="statTotal">0</div><div class="label">全部提醒</div></div>
+    </div>
+    <div class="stat-card today">
+      <span class="icon">⏰</span>
+      <div><div class="val" id="statToday">0</div><div class="label">今日提醒</div></div>
+    </div>
+    <div class="stat-card overdue">
+      <span class="icon">⚠️</span>
+      <div><div class="val" id="statOverdue">0</div><div class="label">已逾期</div></div>
+    </div>
+    <div class="stat-card done">
+      <span class="icon">✅</span>
+      <div><div class="val" id="statDone">0</div><div class="label">已完成</div></div>
+    </div>
+  </div>
+
+  <!-- Add Form -->
+  <div class="card">
+    <h2>➕ 新增提醒</h2>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>供应商</label>
+        <input type="text" id="inputSupplier" placeholder="例如：XX纺织有限公司" list="supplierList">
+        <datalist id="supplierList"></datalist>
+      </div>
+      <div class="form-group">
+        <label>款号</label>
+        <input type="text" id="inputStyle" placeholder="例如：ST-2024-001">
+      </div>
+      <div class="form-group">
+        <label>颜色</label>
+        <input type="text" id="inputColor" placeholder="例如：黑色 / 深蓝色">
+      </div>
+      <div class="form-group">
+        <label>数量</label>
+        <input type="number" id="inputQty" placeholder="例如：500" min="1">
+      </div>
+      <div class="form-group">
+        <label>提醒日期</label>
+        <input type="date" id="inputDate">
+      </div>
+      <div class="form-group">
+        <label>提醒时间</label>
+        <input type="time" id="inputTime">
+      </div>
+      <div class="form-group">
+        <label>备注</label>
+        <input type="text" id="inputRemark" placeholder="例如：已催过一次 / 紧急">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="addReminder()">✅ 添加提醒</button>
+      <button class="btn btn-outline" onclick="clearForm()">🗑️ 清空</button>
+    </div>
+  </div>
+
+  <!-- Reminder List -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+      <h2 style="margin:0;">📋 提醒列表</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-outline" onclick="pullFeishuData()" id="btnPullFeishu">📥 拉取飞书数据</button>
+        <button class="btn btn-outline" onclick="pushToFeishu()" id="btnPushFeishu">📤 同步到飞书</button>
+        <button class="btn btn-success" onclick="exportExcel()">📥 导出Excel</button>
+      </div>
+    </div>
+
+    <!-- Sync Status -->
+    <div id="syncStatus" style="display:none;padding:8px 12px;border-radius:8px;margin-bottom:12px;font-size:13px;"></div>
+
+    <!-- Filters -->
+    <div class="filter-row">
+      <div class="filter-tabs" id="filterTabs">
+        <span class="filter-tab active" data-filter="all" onclick="setFilter('all')">全部</span>
+        <span class="filter-tab" data-filter="active" onclick="setFilter('active')">进行中</span>
+        <span class="filter-tab" data-filter="done" onclick="setFilter('done')">已完成</span>
+      </div>
+      <select class="filter-select" id="supplierFilter" onchange="renderList()">
+        <option value="">全部供应商</option>
+      </select>
+      <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="🔍 搜索供应商、款号、颜色、备注..." oninput="renderList()">
+      </div>
+    </div>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:40px;">✓</th>
+            <th>供应商</th>
+            <th>款号</th>
+            <th>颜色</th>
+            <th>数量</th>
+            <th>提醒日期</th>
+            <th>提醒时间</th>
+            <th>备注</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr class="empty-state">
+            <td colspan="10">
+              <div style="font-size:48px;margin-bottom:12px;">📭</div>
+              <p>暂无提醒记录，请先添加</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h2>✏️ 编辑提醒</h2>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>供应商</label>
+        <input type="text" id="editSupplier" list="supplierList">
+      </div>
+      <div class="form-group">
+        <label>款号</label>
+        <input type="text" id="editStyle">
+      </div>
+      <div class="form-group">
+        <label>颜色</label>
+        <input type="text" id="editColor">
+      </div>
+      <div class="form-group">
+        <label>数量</label>
+        <input type="number" id="editQty" min="1">
+      </div>
+      <div class="form-group">
+        <label>提醒日期</label>
+        <input type="date" id="editDate">
+      </div>
+      <div class="form-group">
+        <label>提醒时间</label>
+        <input type="time" id="editTime">
+      </div>
+      <div class="form-group">
+        <label>备注</label>
+        <input type="text" id="editRemark" placeholder="例如：已催过一次 / 紧急">
+      </div>
+    </div>
+    <input type="hidden" id="editId">
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveEdit()">💾 保存</button>
+      <button class="btn btn-outline" onclick="closeEditModal()">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- Alarm Popup -->
+<div class="alarm-popup" id="alarmPopup">
+  <div class="alarm-popup-inner">
+    <div class="alarm-icon">🚨</div>
+    <h3 id="alarmPopupTitle">催货提醒！</h3>
+    <div id="alarmPopupDetail"></div>
+    <button class="btn-dismiss" onclick="stopAlarm()">🔔 我知道了，关闭闹钟</button>
+  </div>
+</div>
+
+<script>// ========== 配置 ==========const STORAGE_KEY = 'supplier_reminders_v2';// ========== 全局变量 ==========let reminders = [];let editingId = null;let currentFilter = 'all';let alarmDismissed = false;// ========== 后端连接 ==========function getApiBase() {  return localStorage.getItem('server_url') || '';}function saveServerUrl() {  const url = document.getElementById('serverUrl').value.trim();  if (!url) {    showToast('请先输入后端地址', 'error');    return;  }  const cleanUrl = url.replace(/\/+$/, '');  localStorage.setItem('server_url', cleanUrl);  document.getElementById('serverUrl').value = cleanUrl;  checkConnection(cleanUrl);}function checkConnection(url) {  const dot = document.getElementById('connDot');  const txt = document.getElementById('connText');  dot.className = 'status-dot';  dot.style.background = '#faad14';  txt.textContent = '检测中...';  txt.style.color = '#faad14';  const xhr = new XMLHttpRequest();  xhr.open('GET', (url || getApiBase()) + '/health', true);  xhr.timeout = 3000;  xhr.onload = function() {    if (xhr.status === 200) {      try {        const data = JSON.parse(xhr.responseText);        dot.className = 'status-dot connected';        dot.style.background = '#52c41a';        txt.textContent = '已连接';        txt.style.color = '#52c41a';        localStorage.setItem('server_url', url || getApiBase());        document.getElementById('serverUrl').value = url || getApiBase();        syncFromServer();      } catch(e) {        setOffline();      }    } else {      setOffline();    }  };  xhr.onerror = function() { setOffline(); };  xhr.ontimeout = function() { setOffline(); };  xhr.send();}function setOffline() {  const dot = document.getElementById('connDot');  const txt = document.getElementById('connText');  dot.className = 'status-dot disconnected';  dot.style.background = '#ff4d4f';  txt.textContent = '未连接';  txt.style.color = '#8c8c8c';}function initServerConfig() {  const saved = localStorage.getItem('server_url') || '';  const urlInput = document.getElementById('serverUrl');  urlInput.value = saved;  if (!saved) {    urlInput.placeholder = 'https://your-app.vercel.app 或 http://localhost:5199';  }  if (saved) {    checkConnection(saved);  }}// ========== 数据持久化 ==========function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(reminders)); }function saveData() { saveLocal(); syncToServer(); }function syncToServer() {  try {    const xhr = new XMLHttpRequest();    xhr.open('POST', getApiBase() + '/api/reminders', true);    xhr.setRequestHeader('Content-Type', 'application/json');    xhr.timeout = 3000;    xhr.send(JSON.stringify(reminders));  } catch(e) { }}function syncFromServer() {  try {    const xhr = new XMLHttpRequest();    xhr.open('GET', getApiBase() + '/api/reminders', true);    xhr.timeout = 3000;    xhr.onload = function() {      if (xhr.status === 200) {        try {          const serverData = JSON.parse(xhr.responseText);          if (serverData && serverData.length > 0) {            reminders = serverData;            saveLocal();            renderList();            updateStats();            checkAlarms();          }        } catch(e) {}      }    };    xhr.send();  } catch(e) { }}// ========== 飞书同步 ==========function showSyncStatus(msg, type) {  const el = document.getElementById('syncStatus');  el.textContent = msg;  el.style.display = 'block';  el.style.background = type === 'error' ? '#fff1f0' : type === 'ok' ? '#f6ffed' : '#e6f7ff';  el.style.color = type === 'error' ? '#cf1322' : type === 'ok' ? '#389e0d' : '#096dd9';  el.style.border = '1px solid ' + (type === 'error' ? '#ffa39e' : type === 'ok' ? '#b7eb8f' : '#91d5ff');  setTimeout(function() { el.style.display = 'none'; }, 4000);}function pullFeishuData() {  const btn = document.getElementById('btnPullFeishu');  const baseUrl = getApiBase();  if (!baseUrl) {    showSyncStatus('请先填写后端地址并点击"连接"', 'error');    showToast('请先填写后端地址并点击"连接"', 'error');    return;  }  btn.disabled = true;  btn.textContent = '拉取中...';  showSyncStatus('正在从飞书表格拉取数据...', 'info');  const xhr = new XMLHttpRequest();  xhr.open('GET', baseUrl + '/api/feishu/auto-reminders', true);  xhr.timeout = 15000;  xhr.onload = function() {    btn.disabled = false;    btn.textContent = '拉取飞书数据';    if (xhr.status === 200) {      try {        const result = JSON.parse(xhr.responseText);        if (result.code === 0) {          const feishuData = result.data;          const merged = mergeFeishuData(feishuData);          reminders = merged;          saveData();          renderList();          updateStats();          checkAlarms();          showSyncStatus('已从飞书拉取 ' + feishuData.length + ' 条待办提醒', 'ok');        } else {          showSyncStatus('' + (result.msg || '拉取失败'), 'error');        }      } catch(e) {        showSyncStatus('数据解析失败', 'error');      }    } else {      showSyncStatus('后端连接失败 (' + xhr.status + ')', 'error');    }  };  xhr.onerror = function() {    btn.disabled = false;    btn.textContent = '拉取飞书数据';    showSyncStatus('后端连接失败，请检查地址是否正确', 'error');  };  xhr.send();}
+function parseDate(raw) {
+  if (!raw || raw === '待填' || raw === '-') return '';
+  // 支持 Excel 序列号日期（如 45678）
+  const numVal = parseFloat(raw);
+  if (!isNaN(numVal) && numVal > 40000 && numVal < 60000) {
+    const d = new Date((numVal - 25569) * 86400 * 1000);
+    const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+    return y + '-' + m + '-' + day;
+  }
+  // 支持 YYYY-MM-DD, YYYY/MM/DD
+  let match = raw.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+  if (match) {
+    return match[1] + '-' + String(parseInt(match[2])).padStart(2,'0') + '-' + String(parseInt(match[3])).padStart(2,'0');
+  }
+  // 支持 MM月DD日
+  match = raw.match(/(\d{1,2})月(\d{1,2})/);
+  if (match) {
+    const now = new Date();
+    return now.getFullYear() + '-' + String(parseInt(match[1])).padStart(2,'0') + '-' + String(parseInt(match[2])).padStart(2,'0');
+  }
+  return '';
+}
+
+function mergeFeishuData(feishuData) {
+  const merged = [];
+  const styleSeen = {};
+
+  feishuData.forEach(function(r) {
+    const key = r.style;
+    if (!key) return;
+    styleSeen[key] = true;
+    const existing = reminders.find(function(loc) { return loc.style === key; });
+    if (existing) {
+      r.id = existing.id;
+      r.completed = existing.completed;
+      r.time = existing.time || '';
+      if (!r.remark && existing.remark) r.remark = existing.remark;
+      if (!r.color && existing.color) r.color = existing.color;
+      if (!r.supplier && existing.supplier) r.supplier = existing.supplier;
+    }
+    merged.push(r);
+  });
+
+  reminders.forEach(function(r) {
+    if (!styleSeen[r.style] && r.style) {
+      merged.push(r);
+    }
+  });
+
+  return merged;
+}
+
+function pushToFeishu() {  const btn = document.getElementById('btnPushFeishu');  const baseUrl = getApiBase();  if (!baseUrl) {    showSyncStatus('请先填写后端地址并点击"连接"', 'error');    showToast('请先填写后端地址并点击"连接"', 'error');    return;  }  btn.disabled = true;  btn.textContent = '同步中...';  showSyncStatus('正在同步到飞书表格...', 'info');  const xhr = new XMLHttpRequest();  xhr.open('POST', baseUrl + '/api/feishu/sync', true);  xhr.setRequestHeader('Content-Type', 'application/json');  xhr.timeout = 15000;  xhr.onload = function() {    btn.disabled = false;    btn.textContent = '同步到飞书';    if (xhr.status === 200) {      try {        const result = JSON.parse(xhr.responseText);        if (result.ok) {          showSyncStatus('已同步 ' + result.synced + ' 条提醒到飞书表格', 'ok');        } else {          showSyncStatus('同步失败: ' + (result.errors || []).join(', '), 'error');        }      } catch(e) {        showSyncStatus('同步失败', 'error');      }    } else {      showSyncStatus('后端连接失败 (' + xhr.status + ')', 'error');    }  };  xhr.onerror = function() {    btn.disabled = false;    btn.textContent = '同步到飞书';    showSyncStatus('后端连接失败，请检查地址是否正确', 'error');  };  xhr.send(JSON.stringify({ items: reminders }));}
+// ========== 数据操作 ==========
+function loadData() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) {
+    try { reminders = JSON.parse(raw); } catch(e) { reminders = []; }
+  }
+  // 数据迁移
+  let migrated = false;
+  reminders.forEach(function(r) {
+    if (r.completed === undefined) { r.completed = false; migrated = true; }
+    if (r.supplier === undefined) { r.supplier = ''; migrated = true; }
+  });
+  if (migrated) saveData();
+}
+
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '-';
+  const parts = dateStr.split('-');
+  return parts[1] + '月' + parts[2] + '日';
+}
+
+function getStatus(r) {
+  if (r.completed) return 'done';
+  if (!r.date) return 'upcoming';
+  const today = todayStr();
+  if (r.date < today) return 'overdue';
+  if (r.date === today) {
+    if (r.time) {
+      const now = new Date();
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      const parts = r.time.split(':');
+      const remindMinutes = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+      if (nowMinutes < remindMinutes) return 'upcoming';
+    }
+    return 'today';
+  }
+  return 'upcoming';
+}
+
+function statusBadge(r) {
+  const s = getStatus(r);
+  if (s === 'done') return '<span class="badge badge-done">✅ 已完成</span>';
+  if (s === 'overdue') return '<span class="badge badge-overdue">⚠️ 已逾期</span>';
+  if (s === 'today') return '<span class="badge badge-today">⏰ 今天</span>';
+  return '<span class="badge badge-upcoming">⏳ 待提醒</span>';
+}
+
+function rowClass(r) {
+  const s = getStatus(r);
+  if (s === 'done') return 'row-done';
+  if (s === 'overdue') return 'row-overdue';
+  if (s === 'today') return 'row-today';
+  return '';
+}
+
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg, type) {
+  const t = document.createElement('div');
+  t.className = 'toast ' + (type || '');
+  t.innerHTML = msg + '<span style="cursor:pointer;color:#999;margin-left:auto;font-size:18px;" onclick="this.parentElement.remove()">✖</span>';
+  document.body.appendChild(t);
+  setTimeout(function() { if (t.parentElement) t.remove(); }, 4000);
+}
+
+// ========== UI 操作 ==========
+function renderList() {
+  const q = (document.getElementById('searchInput').value || '').toLowerCase();
+  const supplierQ = document.getElementById('supplierFilter').value;
+
+  let filtered = reminders.slice();
+
+  if (currentFilter === 'active') {
+    filtered = filtered.filter(function(r) { return !r.completed; });
+  } else if (currentFilter === 'done') {
+    filtered = filtered.filter(function(r) { return r.completed; });
+  }
+
+  if (q) {
+    filtered = filtered.filter(function(r) {
+      return (r.supplier || '').toLowerCase().includes(q) ||
+             (r.style || '').toLowerCase().includes(q) ||
+             (r.color || '').toLowerCase().includes(q) ||
+             (r.remark || '').toLowerCase().includes(q);
+    });
+  }
+
+  if (supplierQ) {
+    filtered = filtered.filter(function(r) { return r.supplier === supplierQ; });
+  }
+
+  filtered.sort(function(a, b) {
+    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+    const order = { overdue: 0, today: 1, upcoming: 2, done: 3 };
+    return order[getStatus(a)] - order[getStatus(b)] || (a.date || '').localeCompare(b.date || '');
+  });
+
+  const tbody = document.getElementById('tableBody');
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr class="empty-state"><td colspan="10"><div style="font-size:48px;margin-bottom:12px;">📭</div><p>' + (q || supplierQ ? '未找到匹配记录' : '暂无提醒记录，请先添加') + '</p></td></tr>';
+  } else {
+    tbody.innerHTML = filtered.map(function(r) {
+      return '<tr class="' + rowClass(r) + '">' +
+        '<td class="checkbox-cell"><input type="checkbox" ' + (r.completed ? 'checked' : '') + ' onchange="toggleCompleted(\'' + r.id + '\')"></td>' +
+        '<td>' + esc(r.supplier || '-') + '</td>' +
+        '<td><strong>' + esc(r.style) + '</strong></td>' +
+        '<td>' + esc(r.color) + '</td>' +
+        '<td>' + esc(String(r.qty)) + '</td>' +
+        '<td>' + formatDate(r.date) + '</td>' +
+        '<td>' + esc(r.time || '') + '</td>' +
+        '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(r.remark || '') + '">' + esc(r.remark || '') + '</td>' +
+        '<td>' + statusBadge(r) + '</td>' +
+        '<td style="white-space:nowrap;">' +
+          '<button class="btn btn-ghost" onclick="openEdit(\'' + r.id + '\')">✏️ 编辑</button>' +
+          '<button class="btn btn-ghost" style="color:#ff4d4f" onclick="deleteReminder(\'' + r.id + '\')">🗑️ 删除</button>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  updateStats();
+  updateSupplierFilter();
+}
+
+function updateStats() {
+  const active = reminders.filter(function(r) { return !r.completed; });
+  document.getElementById('statTotal').textContent = reminders.length;
+  document.getElementById('statToday').textContent = active.filter(function(r) { return getStatus(r) === 'today'; }).length;
+  document.getElementById('statOverdue').textContent = active.filter(function(r) { return getStatus(r) === 'overdue'; }).length;
+  document.getElementById('statDone').textContent = reminders.filter(function(r) { return r.completed; }).length;
+}
+
+function updateSupplierFilter() {
+  const select = document.getElementById('supplierFilter');
+  const currentVal = select.value;
+  const suppliers = {};
+  reminders.forEach(function(r) { if (r.supplier) suppliers[r.supplier] = true; });
+  const names = Object.keys(suppliers).sort();
+  select.innerHTML = '<option value="">全部供应商</option>' +
+    names.map(function(n) { return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('');
+  select.value = currentVal;
+
+  const datalist = document.getElementById('supplierList');
+  datalist.innerHTML = names.map(function(n) { return '<option value="' + esc(n) + '">'; }).join('');
+}
+
+function addReminder() {
+  const supplier = document.getElementById('inputSupplier').value.trim();
+  const style = document.getElementById('inputStyle').value.trim();
+  const color = document.getElementById('inputColor').value.trim();
+  const qty = document.getElementById('inputQty').value.trim();
+  const date = document.getElementById('inputDate').value;
+  const time = document.getElementById('inputTime').value;
+  const remark = document.getElementById('inputRemark').value.trim();
+
+  reminders.push({
+    id: 'r_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+    supplier: supplier,
+    style: style,
+    color: color,
+    qty: parseInt(qty) || 0,
+    date: date,
+    time: time,
+    remark: remark,
+    completed: false
+  });
+
+  saveData();
+  clearForm();
+  alarmDismissed = false;
+  renderList();
+  showToast('✅ 提醒已添加！', 'success');
+}
+
+function clearForm() {
+  document.getElementById('inputSupplier').value = '';
+  document.getElementById('inputStyle').value = '';
+  document.getElementById('inputColor').value = '';
+  document.getElementById('inputQty').value = '';
+  document.getElementById('inputDate').value = '';
+  document.getElementById('inputTime').value = '';
+  document.getElementById('inputRemark').value = '';
+}
+
+function toggleCompleted(id) {
+  const r = reminders.find(function(x) { return x.id === id; });
+  if (!r) return;
+  r.completed = !r.completed;
+  saveData();
+  renderList();
+  if (r.completed) showToast('✅ 已标记为完成', 'success');
+}
+
+function deleteReminder(id) {
+  if (!confirm('确定要删除这条提醒吗？')) return;
+  reminders = reminders.filter(function(r) { return r.id !== id; });
+  saveData();
+  renderList();
+  showToast('🗑️ 已删除', 'success');
+}
+
+function openEdit(id) {
+  const r = reminders.find(function(x) { return x.id === id; });
+  if (!r) return;
+  editingId = id;
+  document.getElementById('editSupplier').value = r.supplier || '';
+  document.getElementById('editStyle').value = r.style;
+  document.getElementById('editColor').value = r.color;
+  document.getElementById('editQty').value = r.qty;
+  document.getElementById('editDate').value = r.date;
+  document.getElementById('editTime').value = r.time || '';
+  document.getElementById('editRemark').value = r.remark || '';
+  document.getElementById('editModal').classList.add('show');
+}
+
+function closeEditModal() {
+  editingId = null;
+  document.getElementById('editModal').classList.remove('show');
+}
+
+function saveEdit() {
+  const id = editingId;
+  const idx = reminders.findIndex(function(r) { return r.id === id; });
+  if (idx === -1) return;
+
+  reminders[idx].supplier = document.getElementById('editSupplier').value.trim();
+  reminders[idx].style = document.getElementById('editStyle').value.trim();
+  reminders[idx].color = document.getElementById('editColor').value.trim();
+  reminders[idx].qty = parseInt(document.getElementById('editQty').value) || 0;
+  reminders[idx].date = document.getElementById('editDate').value;
+  reminders[idx].time = document.getElementById('editTime').value;
+  reminders[idx].remark = document.getElementById('editRemark').value.trim();
+
+  saveData();
+  closeEditModal();
+  renderList();
+  showToast('✅ 已更新', 'success');
+}
+
+function setFilter(filter) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelector('.filter-tab[data-filter="' + filter + '"]').classList.add('active');
+  renderList();
+}
+
+// ========== 导出 Excel ==========
+function exportExcel() {
+  const headers = ['供应商', '款号', '颜色', '数量', '提醒日期', '提醒时间', '备注', '状态'];
+  const rows = [headers.join(',')];
+
+  let filtered = reminders.slice();
+  if (currentFilter === 'active') filtered = filtered.filter(function(r) { return !r.completed; });
+  else if (currentFilter === 'done') filtered = filtered.filter(function(r) { return r.completed; });
+
+  const q = (document.getElementById('searchInput').value || '').toLowerCase();
+  const supplierQ = document.getElementById('supplierFilter').value;
+  if (q) filtered = filtered.filter(function(r) {
+    return (r.supplier || '').toLowerCase().includes(q) ||
+           (r.style || '').toLowerCase().includes(q) ||
+           (r.color || '').toLowerCase().includes(q) ||
+           (r.remark || '').toLowerCase().includes(q);
+  });
+  if (supplierQ) filtered = filtered.filter(function(r) { return r.supplier === supplierQ; });
+
+  filtered.forEach(function(r) {
+    const statusText = r.completed ? '已完成' : (getStatus(r) === 'overdue' ? '已逾期' : getStatus(r) === 'today' ? '今天' : '待提醒');
+    rows.push([
+      csvCell(r.supplier || ''),
+      csvCell(r.style),
+      csvCell(r.color),
+      r.qty,
+      r.date || '',
+      r.time || '',
+      csvCell(r.remark || ''),
+      statusText
+    ].join(','));
+  });
+
+  const BOM = '\uFEFF';
+  const blob = new Blob([BOM + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const now = new Date();
+  a.download = '今日工作待办_' + now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('📥 导出成功！用Excel打开即可', 'success');
+}
+
+function csvCell(val) {
+  const s = String(val);
+  if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+// ========== 闹钟 ==========
+function checkAlarms() {
+  const active = reminders.filter(function(r) { return !r.completed; });
+  const todayItems = active.filter(function(r) { return getStatus(r) === 'today'; });
+  const overdueItems = active.filter(function(r) { return getStatus(r) === 'overdue'; });
+
+  const banner = document.getElementById('alarmBanner');
+  if (todayItems.length > 0 || overdueItems.length > 0) {
+    document.getElementById('alarmCount').textContent = todayItems.length;
+    document.getElementById('overdueCount').textContent = overdueItems.length;
+    banner.classList.add('show');
+  } else {
+    banner.classList.remove('show');
+  }
+
+  if (alarmDismissed) return;
+
+  const allItems = todayItems.concat(overdueItems);
+  if (allItems.length > 0) {
+    triggerAlarm(allItems);
+  }
+}
+
+function triggerAlarm(items) {
+  const popup = document.getElementById('alarmPopup');
+  const title = document.getElementById('alarmPopupTitle');
+  const detail = document.getElementById('alarmPopupDetail');
+
+  const overdueCount = items.filter(function(r) { return getStatus(r) === 'overdue'; }).length;
+  const todayCount = items.filter(function(r) { return getStatus(r) === 'today'; }).length;
+
+  const titleParts = [];
+  if (overdueCount > 0) titleParts.push(overdueCount + ' 条已逾期');
+  if (todayCount > 0) titleParts.push(todayCount + ' 条今天到期');
+  title.textContent = '催货提醒！' + titleParts.join('，');
+
+  detail.innerHTML = items.map(function(r) {
+    const s = getStatus(r);
+    const label = s === 'overdue' ? '🔴 逾期' : '🟠 今天';
+    const timeLabel = r.time ? ' 🕒' + esc(r.time) : '';
+    return '<div style="padding:6px 0;border-bottom:1px solid #f0f0f0;">' + label + ' <strong>' + esc(r.style) + '</strong> ' + esc(r.color) + ' x' + esc(String(r.qty)) + timeLabel + (r.supplier ? ' <small>(' + esc(r.supplier) + ')</small>' : '') + '</div>';
+  }).join('');
+
+  popup.classList.add('show');
+}
+
+function stopAlarm() {
+  document.getElementById('alarmPopup').classList.remove('show');
+  alarmDismissed = true;
+}
+
+function dismissAlarm() {
+  document.getElementById('alarmBanner').classList.remove('show');
+  document.getElementById('searchInput').value = '';
+  renderList();
+}
+
+// ========== 初始化 ==========
+function init() {
+  const now = new Date();
+  const days = ['日','一','二','三','四','五','六'];
+  document.getElementById('headerDate').textContent =
+    now.getFullYear() + '年' + (now.getMonth()+1) + '月' + now.getDate() + '日 星期' + days[now.getDay()];
+
+  document.getElementById('inputDate').value = todayStr();
+
+
+  loadData();
+  initServerConfig();
+  renderList();
+  checkAlarms();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+
+// Click outside modal to close
+document.getElementById('editModal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditModal();
+});
+</script>
+
+</body>
+</html>

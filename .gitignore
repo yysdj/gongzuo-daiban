@@ -1,0 +1,8 @@
+dist/
+fix_*.py
+start_*.bat
+wechat_reminder.py
+run_daily_reminder.bat
+.workbuddy/
+.codebuddy/
+deploy/
